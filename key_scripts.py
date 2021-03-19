@@ -31,19 +31,19 @@ def on_release(key):
       keys_state[key] = 0
 
 
-move_cnt = 0
 def on_move(x, y):
    global mouse_state
    global move_cnt
-   if move_cnt == 10:
-      mouse_state[2:4] = [x-mouse_state[0],y-mouse_state[1]]
-      mouse_state[0:2] = [x,y]
-      move_cnt = 0
-   move_cnt = move_cnt+1
+   mouse_state[2:4] = [x-mouse_state[0],y-mouse_state[1]]
+   mouse_state[0:2] = [x,y]
+
+def on_click(x, y, button, pressed):
+   global mouse_state
+   global move_cnt
    
 
 key_listener = keyboard.Listener(on_press=on_press,on_release=on_release)
-mouse_listener = mouse.Listener(on_move=on_move)
+mouse_listener = mouse.Listener(on_move=on_move, on_click=on_click)
 
 
 key_listener.start()
@@ -73,4 +73,16 @@ def replay_state(state):
    pydirectinput.moveTo(mouse_state[0],mouse_state[1])
 
 
+def read_logs(out_file):
+   logs = open(out_file).read().split('\n')[:-1]
+   logs = [[int(i) for i in row.split(',')] for row in logs]
+   
+   return logs
+   
+
+
 print('key_script done')
+logs = read_logs('data\\38.txt')
+for log in logs:
+   replay_state(log)
+
