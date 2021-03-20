@@ -2,73 +2,104 @@ import key_scripts
 import video_scripts
 import log_scripts
 from vidgear.gears import WriteGear
-import pynput.keyboard as keyboard
+import win32api as wapi
 import os
 import threading
+import time
 
+"""
+    press f11 to start captuing frames
+    press f11 again to stop captuing
+    press f10 to delete current capture, and restart immidately
+    press f9 to stop program immidately
+"""
 
 output_params = {"-vcodec":"MPEG", "-input_framerate": 25}
-def capture(out_file):
-    vid_out = WriteGear(out_file+'.avi',compression_mode=False,
-                        custom_ffmpeg='C:\Program Files (x86)\ffmpeg\bin',**output_params)
-    txt_out = open(out_file+'.txt', 'w')
-    
-    for i in range(512):
-        vid_out.write(video_scripts.get_state())
-        txt_out.write(key_scripts.get_state())
-
-    vid_out.close()
-    txt_out.close()
-
-
 capture_state = 0
 del_it = 0
 start = len(os.listdir('data'))//2 + 1
-    
-def start_capture():
-    global start
-    global del_it
+
+
+def capture():
     global capture_state
+    global del_it
+    global start
+
     
-    while capture_state:
-        capture(str(start))
-        if del_it:
-            log_scripts.log_msg('deleted ' + str(start))
-            os.remove(str(start)+'.avi')
-            os.remove(str(start)+'.txt')
-        else:
-            log_scripts.log_msg('saving '+ str(start))
-            start = start + 1
+    # while in not_exit mode
+    while capture_state != 2:
+
+        out_file = str(start)
+        # capture mode
+        if capture_state == 1:
+            log_scripts.log_msg('capturing : '+out_file)
             
-    log_scripts.log_msg('stoping capture')
+            out_file = 'data\\'+out_file
+            vid_out = WriteGear(out_file+'.avi',compression_mode=False,
+                                custom_ffmpeg='C:\Program Files (x86)\ffmpeg\bin',**output_params)
+            txt_out = open(out_file+'.txt', 'w')
 
+            # capture 512 frames, or stop if altered
+            cnt = 0
+            while cnt <= 512 and not del_it:
+                vid_out.write(video_scripts.get_state())
+                txt_out.write(key_scripts.get_state())
+                cnt = cnt + 1
+            
+            vid_out.close()
+            txt_out.close()
 
-capture_thread = None
-def alter(key):
-    global start
-    global del_it
-    global capture_state
-    global capture_thread
-
-    print('altering')
-    if key == keyboard.Key.f11:
-        if capture_state == 0:
-            log_scripts.log_msg('starting capture')
-            capture_state = 1
-            capture_thread = threading.Thread(target=start_capture)
-            capture_thread.start()
+            # if delete
+            if del_it:
+                os.remove(out_file+'.avi')
+                os.remove(out_file+'.txt')
+                del_it = 0
+                capture_state = 0
+                log_scripts.log_msg('deleting : '+out_file)
+                log_scripts.log_msg('state  : False')
+                log_scripts.log_msg('Capturing : Stop')
+            else:
+                log_scripts.log_msg('saving : '+out_file)
+                start = start + 1
         else:
-            capture_state = 0
-            capture_thread.join()
-    elif key == keyboard.Key.f10:
-        del_it = 1
-    elif key == keyboard.Key.f9:
-        capture_state = 0
-        capture_thread.join()
-        return False
+            log_scripts.log_msg('at hold')
+            time.sleep(2)
+    log_scripts.log_msg('capture thread exited')
+    exit()
+    
+            
+            
+try:
+    
+    capture_thread = threading.Thread(target=capture)
+    capture_thread.start()
+
+    f11_state = 0
+    f10_state = 0
+    f9_state = 0
+    while capture_state != 2:
+        f11 = wapi.GetAsyncKeyState(0x7A)
+        f10 = wapi.GetAsyncKeyState(0x79)
+        f9 = wapi.GetAsyncKeyState(0x78)
+        
+        if f11 and f11_state == 0:
+            print('alter')
+            capture_state = 1 if capture_state == 0 else 0
+            
+        if f10 and f10_state == 0:
+            del_it = 1
+            
+        if f9 and f9_state == 0:
+            capture_state = 2
+
+        f11_state = f11
+        f10_state = f10
+        f9_state = f9
 
 
-with keyboard.Listener(on_press=alter) as listener:
-    log_script.log_msg('starting with', start)
-    listener.join()
+    log_scripts.log_msg('exiting')
+    capture_thread.join()
+except KeyboardInterrupt:
+    exit()
 
+ 
